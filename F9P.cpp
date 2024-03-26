@@ -103,7 +103,7 @@ void F9P::run() {
 
             while (!_requestStop && numTries < 3) {
                 int helperRet = gpsDriver->receive(GPS_RECEIVE_TIMEOUT);
-                SendDummyRTCM();
+
                 if (helperRet > 0) {
                     numTries = 0;
 
@@ -226,7 +226,7 @@ void F9P::publishGPSSatellite() {
 //    printf("publishGPSSatellite\n");
 }
 
-void F9P::SendDummyRTCM() { 
+void F9P::SendDummyRTCM() {
     const size_t len = 150;
     uint8_t dummyData[len];
 
@@ -241,8 +241,8 @@ void F9P::sendRTCM() {
     while (!_requestStop) {
         std::unique_lock<std::mutex> lock(_queueMutex);
         _cv.wait(lock, [this]{ return !_messageQueue.empty() || _requestStop; });
-//        std::cout << "_messageQueue(" << _messageQueue.size() << ")\n";
         while (!_messageQueue.empty()) {
+            std::cout << "_messageQueue(" << _messageQueue.size() << ")\n";
             auto message = _messageQueue.front();
             _messageQueue.pop();
             lock.unlock();
