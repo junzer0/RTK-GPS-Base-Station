@@ -20,6 +20,10 @@ MavlinkStream::~MavlinkStream() {
     if (_udpSock >= 0) { close(_udpSock); }
 }
 
+void MavlinkStream::setActiveBaseStationId(uint8_t id) {
+    _activeBaseStationId = id;
+}
+
 bool MavlinkStream::initBroadcast(const string &ip, int port) {
     _udpSock = socket(AF_INET, SOCK_DGRAM, 0);
     if (_udpSock < 0) {
@@ -110,8 +114,10 @@ void MavlinkStream::RTCMDataUpdate(std::vector<uint8_t> message) {
 }
 
 void MavlinkStream::sendMessageToVehicle(const mavlink_gps_rtcm_data_t &msg) {
+    mavlink_message_t message;
     mavlink_message_t wifi_message;
     mavlink_message_t lora_message;
+    mavlink_msg_gps_rtcm_data_encode_chan(0, _activeBaseStationId, 0, &message, &msg);
     mavlink_msg_gps_rtcm_data_encode_chan(0, 15, 0, &wifi_message, &msg);
     mavlink_msg_gps_rtcm_data_encode_chan(0, 15, 1, &lora_message, &msg);
 //    cout << "Send rtcm\n";
