@@ -9,6 +9,7 @@
 #define LORA_PACKET_MAX 240
 #define LORA_PAYLOAD 237
 #define LORA_CHANNEL 80
+#define BASE_STATION_1_COMPONENT_ID 191
 
 using namespace std;
 class ElapsedTimer {
@@ -50,6 +51,7 @@ public:
     bool initBroadcast(const string& ip, int port);
     bool initLora(const string& device);
     void RTCMDataUpdate(vector<uint8_t> message);
+    void setActiveBaseStationId(uint8_t id);
     int sendToLora(const mavlink_message_t& msg);
     int sendToUDP(const mavlink_message_t& msg);
 
@@ -61,6 +63,8 @@ private:
     ElapsedTimer _bandwidthTimer;
     int _bandwidthByteCounter;
     uint8_t _sequenceId;
+
+    uint8_t _activeBaseStationId;
 
     static constexpr uint8_t LORA_HEADER[3] = {0xFF, 0xFF, static_cast<uint8_t>(LORA_CHANNEL)};
 
