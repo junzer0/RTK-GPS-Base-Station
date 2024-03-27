@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
 
     try {
         MavlinkStream mavlinkStream(udp_ip, udp_port, lora_device);
-
+        mavlinkStream.setActiveBaseStationId(BASE_STATION_1_COMPONENT_ID);
         F9P f9p(f9p_device, SURVEY_ACC_METER, SURVEY_DURATION_SECS, false, true, &mavlinkStream);
         f9p.run();
     }
