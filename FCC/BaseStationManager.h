@@ -20,6 +20,7 @@ public:
     void setActiveBaseStation(int componentId);
     int getActiveBaseStation() const;
     void printBaseStations() const;
+    void printActiveBaseStations() const;
 
 private:
     std::set<int> baseStations; // 모든 Base Station의 컴포넌트 ID 저장
