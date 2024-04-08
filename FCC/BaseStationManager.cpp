@@ -28,3 +28,11 @@ void BaseStationManager::printBaseStations() const {
         std::cout << std::endl;
     }
 }
+
+void BaseStationManager::printActiveBaseStations() const {
+    for (int id : baseStations) {
+        std::cout << "Base Station ID: " << id;
+        if (id == activeBaseStationId) std::cout << " (Active)";
+        std::cout << std::endl;
+    }
+}
