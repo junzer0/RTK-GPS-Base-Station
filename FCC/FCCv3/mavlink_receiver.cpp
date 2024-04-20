@@ -2691,31 +2691,9 @@ void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg) {
 
         _gps_inject_data_pub.publish(gps_inject_data_topic);
 
-        // 수신된 메시지 카운터 증가
-        _total_received_counter++;
-
-        // BS ID 변경 여부 확인
-        if (should_switch_bs_id()) {
-            _current_active_bs_id = 16;  // BS ID를 16으로 변경
-        }
-    } else {
-        // 다른 BS ID에서 수신된 GPS RTCM 데이터는 무시
-    }
+    } 
 }
 
-bool MavlinkReceiver::should_switch_bs_id() const {
-    // 일정 수신 횟수 이상인 경우 BS ID 변경
-    constexpr uint8_t switch_threshold = 3;  // BS ID 변경 임계값
-    return _total_received_counter > switch_threshold;
-}
-
-
-
-bool MavlinkReceiver::should_switch_bs_id() const {
-    // Check if we should switch BS ID based on received message count
-    constexpr uint8_t switch_threshold = 3;  // Threshold for switching BS ID
-    return _total_received_counter > switch_threshold;
-}
 
 void
 MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
