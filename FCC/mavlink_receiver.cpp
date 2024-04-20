@@ -60,7 +60,6 @@
 #include "mavlink_command_sender.h"
 #include "mavlink_main.h"
 #include "mavlink_receiver.h"
-#include "BaseStationManager.h"
 
 #include <lib/drivers/device/Device.hpp> // For DeviceId union
 
@@ -69,6 +68,8 @@
 #else
 #define MAVLINK_RECEIVER_NET_ADDED_STACK 0
 #endif
+
+uint16_t MavlinkReceiver::_sbp_crc_buf[256] = {0};
 
 MavlinkReceiver::~MavlinkReceiver()
 {
@@ -79,16 +80,6 @@ MavlinkReceiver::~MavlinkReceiver()
 #if !defined(CONSTRAINED_FLASH)
 	delete[] _received_msg_stats;
 #endif // !CONSTRAINED_FLASH
-
-	_distance_sensor_pub.unadvertise();
-	_gps_inject_data_pub.unadvertise();
-	_rc_pub.unadvertise();
-	_manual_control_input_pub.unadvertise();
-	_ping_pub.unadvertise();
-	_radio_status_pub.unadvertise();
-	_sensor_baro_pub.unadvertise();
-	_sensor_gps_pub.unadvertise();
-	_sensor_optical_flow_pub.unadvertise();
 }
 
 static constexpr vehicle_odometry_s vehicle_odometry_empty {
@@ -234,9 +225,7 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		break;
 
 	case MAVLINK_MSG_ID_GPS_RTCM_DATA:
-        if (_baseStationManager.isActiveBaseStation(msg->compid)) {
-            handle_message_gps_rtcm_data(msg);
-        }
+		handle_message_gps_rtcm_data(msg);
 		break;
 
 	case MAVLINK_MSG_ID_BATTERY_STATUS:
@@ -287,14 +276,18 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 		handle_message_statustext(msg);
 		break;
 
+	case MAVLINK_MSG_ID_LED_CONTROL:
+		handle_message_led_control(msg);
+		break;
+
+	case MAVLINK_MSG_ID_SCENARIO_CMD:
+		handle_message_scenario_cmd(msg);
+		break;
+
 #if !defined(CONSTRAINED_FLASH)
 
 	case MAVLINK_MSG_ID_NAMED_VALUE_FLOAT:
 		handle_message_named_value_float(msg);
-		break;
-
-	case MAVLINK_MSG_ID_NAMED_VALUE_INT:
-		handle_message_named_value_int(msg);
 		break;
 
 	case MAVLINK_MSG_ID_DEBUG:
@@ -329,13 +322,6 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 	case MAVLINK_MSG_ID_GIMBAL_DEVICE_ATTITUDE_STATUS:
 		handle_message_gimbal_device_attitude_status(msg);
 		break;
-
-#if defined(MAVLINK_MSG_ID_SET_VELOCITY_LIMITS) // For now only defined if development.xml is used
-
-	case MAVLINK_MSG_ID_SET_VELOCITY_LIMITS:
-		handle_message_set_velocity_limits(msg);
-		break;
-#endif
 
 	default:
 		break;
@@ -1225,21 +1211,6 @@ MavlinkReceiver::handle_message_set_gps_global_origin(mavlink_message_t *msg)
 	handle_request_message_command(MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN);
 }
 
-#if defined(MAVLINK_MSG_ID_SET_VELOCITY_LIMITS) // For now only defined if development.xml is used
-void MavlinkReceiver::handle_message_set_velocity_limits(mavlink_message_t *msg)
-{
-	mavlink_set_velocity_limits_t mavlink_set_velocity_limits;
-	mavlink_msg_set_velocity_limits_decode(msg, &mavlink_set_velocity_limits);
-
-	velocity_limits_s velocity_limits{};
-	velocity_limits.horizontal_velocity = mavlink_set_velocity_limits.horizontal_speed_limit;
-	velocity_limits.vertical_velocity = mavlink_set_velocity_limits.vertical_speed_limit;
-	velocity_limits.yaw_rate = mavlink_set_velocity_limits.yaw_rate_limit;
-	velocity_limits.timestamp = hrt_absolute_time();
-	_velocity_limits_pub.publish(velocity_limits);
-}
-#endif // MAVLINK_MSG_ID_SET_VELOCITY_LIMITS
-
 void
 MavlinkReceiver::handle_message_vision_position_estimate(mavlink_message_t *msg)
 {
@@ -1753,7 +1724,7 @@ MavlinkReceiver::handle_message_battery_status(mavlink_message_t *msg)
 
 	battery_status.voltage_v = voltage_sum;
 	battery_status.voltage_filtered_v  = voltage_sum;
-	battery_status.current_a = (float)(battery_mavlink.current_battery) / 100.0f;
+	battery_status.current_a = battery_status.current_filtered_a = (float)(battery_mavlink.current_battery) / 100.0f;
 	battery_status.current_filtered_a = battery_status.current_a;
 	battery_status.remaining = (float)battery_mavlink.battery_remaining / 100.0f;
 	battery_status.discharged_mah = (float)battery_mavlink.current_consumed;
@@ -2094,7 +2065,6 @@ MavlinkReceiver::handle_message_manual_control(mavlink_message_t *msg)
 	manual_control_setpoint.yaw = mavlink_manual_control.r / 1000.f;
 	manual_control_setpoint.data_source = manual_control_setpoint_s::SOURCE_MAVLINK_0 + _mavlink->get_instance_id();
 	manual_control_setpoint.timestamp = manual_control_setpoint.timestamp_sample = hrt_absolute_time();
-	manual_control_setpoint.valid = true;
 	_manual_control_input_pub.publish(manual_control_setpoint);
 }
 
@@ -2380,10 +2350,10 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 
 	gps.device_id = device_id.devid;
 
-	gps.latitude_deg = hil_gps.lat * 1e-7;
-	gps.longitude_deg = hil_gps.lon * 1e-7;
-	gps.altitude_msl_m = hil_gps.alt * 1e-3;
-	gps.altitude_ellipsoid_m = hil_gps.alt * 1e-3;
+	gps.lat = hil_gps.lat;
+	gps.lon = hil_gps.lon;
+	gps.alt = hil_gps.alt;
+	gps.alt_ellipsoid = hil_gps.alt;
 
 	gps.s_variance_m_s = 0.25f;
 	gps.c_variance_rad = 0.5f;
@@ -2460,10 +2430,10 @@ MavlinkReceiver::handle_message_landing_target(mavlink_message_t *msg)
 
 	} else if (landing_target.position_valid) {
 		// We only support MAV_FRAME_LOCAL_NED. In this case, the frame was unsupported.
-		mavlink_log_critical(&_mavlink_log_pub, "Landing target: coordinate frame %" PRIu8 " unsupported\t",
+		mavlink_log_critical(&_mavlink_log_pub, "landing target: coordinate frame %" PRIu8 " unsupported\t",
 				     landing_target.frame);
 		events::send<uint8_t>(events::ID("mavlink_rcv_lnd_target_unsup_coord"), events::Log::Error,
-				      "Landing target: unsupported coordinate frame {1}", landing_target.frame);
+				      "landing target: unsupported coordinate frame {1}", landing_target.frame);
 
 	} else {
 		irlock_report_s irlock_report{};
@@ -2646,25 +2616,65 @@ MavlinkReceiver::handle_message_collision(mavlink_message_t *msg)
 	_collision_report_pub.publish(collision_report);
 }
 
-void
-MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg)
-{
-	mavlink_gps_rtcm_data_t gps_rtcm_data_msg;
-	mavlink_msg_gps_rtcm_data_decode(msg, &gps_rtcm_data_msg);
+#include "mavlink_receiver.h"
 
-	gps_inject_data_s gps_inject_data_topic{};
+MavlinkReceiver::MavlinkReceiver() : _gps_inject_data_pub(ORB_ID(gps_inject_data)) {}
 
-	gps_inject_data_topic.timestamp = hrt_absolute_time();
+MavlinkReceiver::~MavlinkReceiver() {}
 
-	gps_inject_data_topic.len = math::min((int)sizeof(gps_rtcm_data_msg.data),
-					      (int)sizeof(uint8_t) * gps_rtcm_data_msg.len);
-	gps_inject_data_topic.flags = gps_rtcm_data_msg.flags;
-	memcpy(gps_inject_data_topic.data, gps_rtcm_data_msg.data,
-	       math::min((int)sizeof(gps_inject_data_topic.data), (int)sizeof(uint8_t) * gps_inject_data_topic.len));
+void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg) {
+    mavlink_gps_rtcm_data_t gps_rtcm_data_msg;
+    mavlink_msg_gps_rtcm_data_decode(msg, &gps_rtcm_data_msg);
 
-	gps_inject_data_topic.timestamp = hrt_absolute_time();
-	_gps_inject_data_pub.publish(gps_inject_data_topic);
+    // 송신자 ID 확인
+    uint8_t sender_id = gps_rtcm_data_msg.sender_id;
+
+    // BS ID 상수 정의
+    const uint8_t main_bs_id = 15;  // 메인 BS ID
+    const uint8_t alt_bs_id = 16;   // 대체 BS ID
+
+    // 버스트 패킷 손실 모니터링을 위한 멤버 변수
+    static uint8_t bust_packet_loss_cnt[] = {0, 0}; // 각 BS의 패킷 손실 카운터
+    static uint8_t selected_idx = 0;                 // 현재 선택된 BS 인덱스 (0 또는 1)
+    static uint8_t selected_id = main_bs_id;         // 현재 선택된 BS ID 초기화
+
+    // 현재 시퀀스 번호 업데이트 (송신자 ID에 따라)
+    if (sender_id == main_bs_id || sender_id == alt_bs_id) {
+        // 현재 선택된 BS와 송신된 데이터의 BS ID가 일치하는 경우에만 처리
+        _curr_seq[selected_idx] = msg->seq;
+
+        // 패킷 손실 확인 및 손실 카운터 업데이트
+        if (_curr_seq[selected_idx] - _prev_seq[selected_idx] == 0) {
+            bust_packet_loss_cnt[selected_idx]++;
+        } else {
+            bust_packet_loss_cnt[selected_idx] = 0;
+        }
+
+        // 버스트 패킷 손실 임계값을 초과하면 선택된 BS 변경
+        if (bust_packet_loss_cnt[selected_idx] > 5) {
+            // 현재 선택된 BS를 변경하여 다음 BS로 전환
+            selected_idx = (selected_idx + 1) % 2; // 0 또는 1 사이클
+            selected_id = (selected_idx == 0) ? main_bs_id : alt_bs_id;
+            bust_packet_loss_cnt[selected_idx] = 0; // 새로운 BS의 손실 카운터 초기화
+        }
+    }
+
+    // 현재 선택된 BS에서만 RTCM 데이터 처리 및 RTK-GPS로 전송
+    if (sender_id == selected_id) {
+        // RTCM 데이터를 RTK-GPS로 전송하기 위해 데이터 준비
+        gps_inject_data_s gps_inject_data_topic{};
+        gps_inject_data_topic.timestamp = hrt_absolute_time();
+        gps_inject_data_topic.len = math::min(static_cast<int>(sizeof(gps_rtcm_data_msg.data)),
+                                              static_cast<int>(sizeof(uint8_t) * gps_rtcm_data_msg.len));
+        gps_inject_data_topic.flags = gps_rtcm_data_msg.flags;
+        memcpy(gps_inject_data_topic.data, gps_rtcm_data_msg.data, static_cast<size_t>(gps_inject_data_topic.len));
+
+        // GPS RTCM 데이터를 publish
+        _gps_inject_data_pub.publish(gps_inject_data_topic);
+    }
 }
+
+
 
 void
 MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
@@ -2742,8 +2752,6 @@ MavlinkReceiver::handle_message_hil_state_quaternion(mavlink_message_t *msg)
 
 		matrix::Eulerf euler{matrix::Quatf(hil_state.attitude_quaternion)};
 		hil_local_pos.heading = euler.psi();
-		hil_local_pos.heading_good_for_control = PX4_ISFINITE(euler.psi());
-		hil_local_pos.unaided_heading = NAN;
 		hil_local_pos.xy_global = true;
 		hil_local_pos.z_global = true;
 		hil_local_pos.vxy_max = INFINITY;
@@ -2807,22 +2815,6 @@ MavlinkReceiver::handle_message_named_value_float(mavlink_message_t *msg)
 {
 	mavlink_named_value_float_t debug_msg;
 	mavlink_msg_named_value_float_decode(msg, &debug_msg);
-
-	debug_key_value_s debug_topic{};
-
-	debug_topic.timestamp = hrt_absolute_time();
-	memcpy(debug_topic.key, debug_msg.name, sizeof(debug_topic.key));
-	debug_topic.key[sizeof(debug_topic.key) - 1] = '\0'; // enforce null termination
-	debug_topic.value = debug_msg.value;
-
-	_debug_key_value_pub.publish(debug_topic);
-}
-
-void
-MavlinkReceiver::handle_message_named_value_int(mavlink_message_t *msg)
-{
-	mavlink_named_value_int_t debug_msg;
-	mavlink_msg_named_value_int_decode(msg, &debug_msg);
 
 	debug_key_value_s debug_topic{};
 
@@ -3117,6 +3109,44 @@ MavlinkReceiver::handle_message_gimbal_device_attitude_status(mavlink_message_t 
 	_gimbal_device_attitude_status_pub.publish(gimbal_attitude_status);
 }
 
+void MavlinkReceiver::handle_message_led_control(mavlink_message_t *msg)
+{
+	mavlink_led_control_t led;
+	mavlink_msg_led_control_decode(msg, &led);
+
+	struct show_led_control_s lc;
+	memset(&lc, 0, sizeof(lc));
+
+	lc.timestamp = hrt_absolute_time();
+	lc.r    = led.r;
+	lc.g    = led.g;
+	lc.b    = led.b;
+
+	_show_led_pub.publish(lc);
+}
+
+void MavlinkReceiver::handle_message_scenario_cmd(mavlink_message_t *msg)
+{
+	mavlink_scenario_cmd_t cmd_msg;
+	mavlink_msg_scenario_cmd_decode(msg, &cmd_msg);
+
+	struct scenario_command_s cmd_topic;
+	memset(&cmd_topic, 0, sizeof(cmd_topic));
+
+	if ( mavlink_system.sysid == cmd_msg.target_system) {
+		cmd_topic.timestamp = hrt_absolute_time();
+		cmd_topic.cmd = cmd_msg.cmd;
+		cmd_topic.param1 = cmd_msg.param1;
+		cmd_topic.param2 = cmd_msg.param2;
+		cmd_topic.param3 = cmd_msg.param3;
+		cmd_topic.param4 = cmd_msg.param4;
+		memcpy(cmd_topic.param5, cmd_msg.param5, sizeof(cmd_msg.param5));
+
+		_scenario_cmd_pub.publish(cmd_topic);
+	}
+
+}
+
 void
 MavlinkReceiver::run()
 {
@@ -3314,9 +3344,7 @@ MavlinkReceiver::run()
 			_mission_manager.check_active_mission();
 			_mission_manager.send();
 
-			if (_mavlink->get_mode() != Mavlink::MAVLINK_MODE::MAVLINK_MODE_IRIDIUM) {
-				_parameters_manager.send();
-			}
+			_parameters_manager.send();
 
 			if (_mavlink->ftp_enabled()) {
 				_mavlink_ftp.send();
