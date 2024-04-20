@@ -2632,7 +2632,7 @@ void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg) {
 
     // PSEUDO CODE
     const uint32_t  MAX_BURST_PACKET_NUM = 5;
-    const uint8_t base_station_id[] = {123, 456};
+    const uint8_t base_station_id[] = {15, 16};
 
     // TODO: to member variables
     _bust_packet_loss_cnt[] = {0,0};
