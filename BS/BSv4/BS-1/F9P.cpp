@@ -1,7 +1,7 @@
 #include "F9P.hpp"
 
 int main(int argc, char **argv) {
-    string udp_ip = "10.42.0.124";
+    string udp_ip = "10.42.0.255";
     int udp_port = 9750;
     string lora_device = "/dev/ttyUSB0";
     string f9p_device = "/dev/ttyACM0";
