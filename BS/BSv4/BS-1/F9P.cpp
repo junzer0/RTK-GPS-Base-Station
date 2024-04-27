@@ -100,7 +100,11 @@ void F9P::run() {
             //In rare cases it can happen that we get an error from the driver (eg. checksum failure) due to
             //bus errors or buggy firmware. In this case we want to try multiple times before giving up.
             int numTries = 0;
-
+            while(1) //
+            {
+				    SendDummyRTCM();
+					sleep(0.5)
+			}
             while (!_requestStop && numTries < 3) {
                 int helperRet = gpsDriver->receive(GPS_RECEIVE_TIMEOUT);
 
