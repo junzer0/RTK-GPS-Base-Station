@@ -2620,9 +2620,9 @@ void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg) {
     mavlink_gps_rtcm_data_t gps_rtcm_data_msg;
     mavlink_msg_gps_rtcm_data_decode(msg, &gps_rtcm_data_msg);
 
-    const uint32_t MAX_BURST_PACKET_NUM = 5;
-    const uint8_t BASE_STATION_NUM = 2;
-    const uint8_t base_station_id[] = {15, 16};
+    const int MAX_BURST_PACKET_NUM = 5;
+    const int BASE_STATION_NUM = 2;
+    const int base_station_id[] = {15, 16};
 
     // Ensure these are initialized in the constructor or appropriately before use
     static int burst_packet_loss_cnt[BASE_STATION_NUM] = {0, 0};
@@ -2632,7 +2632,7 @@ void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg) {
 
     // Update the current sequence
     for (int i = 0; i < BASE_STATION_NUM; ++i) {
-        if (base_station_id[i] == gps_rtcm_data_msg.sender_id) {
+        if (base_station_id[i] == msg->compid) {
             curr_seq[i] = msg->seq;
         }
     }
@@ -2652,7 +2652,7 @@ void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg) {
     }
 
     // Transmit data to RTK-GPS if the sender is the current selected base station
-    if (gps_rtcm_data_msg.sender_id == base_station_id[selected_idx]) {
+    if (msg->compid == base_station_id[selected_idx]) {
         gps_inject_data_s gps_inject_data_topic{};
         gps_inject_data_topic.timestamp = hrt_absolute_time();
         gps_inject_data_topic.len = math::min(static_cast<int>(sizeof(gps_rtcm_data_msg.data)), static_cast<int>(gps_rtcm_data_msg.len));
