@@ -62,7 +62,7 @@ void F9P::run() {
             cout << "========= Failed to open F9P Device =========\n" << _device << _f9p->errorString();
             throw std::runtime_error("Failed to initialize F9P");
         }
-    }d
+    }
     _f9p->setBaudRate(115200);
 //    _f9p->setDataBits(QSerialPort::Data8);
 //    _f9p->setParity(QSerialPort::NoParity);
