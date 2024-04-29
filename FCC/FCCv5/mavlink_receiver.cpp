@@ -2619,6 +2619,7 @@ MavlinkReceiver::handle_message_collision(mavlink_message_t *msg)
 void MavlinkReceiver::handle_message_gps_rtcm_data(mavlink_message_t *msg) {
     mavlink_gps_rtcm_data_t gps_rtcm_data_msg;
     mavlink_msg_gps_rtcm_data_decode(msg, &gps_rtcm_data_msg);
+	PX4_INFO("Component ID: %d", msg->compid);
 
     const int MAX_BURST_PACKET_NUM = 5;
     const int BASE_STATION_NUM = 2;
