@@ -73,10 +73,10 @@ void F9P::run() {
     GPSBaseStationSupport *gpsDriver = nullptr;
 
     _sendRTCMThread = std::thread(&F9P::sendRTCM, this);
-	while(1){
-	    	SendDummyRTCM();
-		std::this_thread::sleep_for(std::chrono::milliseconds(200));
-   	 }
+//	while(1){
+//	    	SendDummyRTCM();
+//		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+//   	 }
     while (!_requestStop) {
 
         if (gpsDriver) {
