@@ -103,7 +103,7 @@ void F9P::run() {
             while(1) //
             {
 				    SendDummyRTCM();
-					sleep(0.5)
+				    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			}
             while (!_requestStop && numTries < 3) {
                 int helperRet = gpsDriver->receive(GPS_RECEIVE_TIMEOUT);
