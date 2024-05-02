@@ -51,7 +51,7 @@ void F9P::run() {
         // Give the device some time to come up. In some cases the device is not
         // immediately accessible right after startup for some reason. This can take 10-20s.
         while (retries-- > 0 && _f9p->error() == WSerial::Serial::PermissionError) { // permission error
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
             if (_f9p->open()) {
                 _f9p->clearError();
