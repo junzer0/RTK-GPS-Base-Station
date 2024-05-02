@@ -55,7 +55,7 @@ bool MavlinkStream::initLora(const string &device) {
         // immediately accessible right after startup for some reason. This can take 10-20s.
         while (retries-- > 0 && _lora->error() == WSerial::Serial::PermissionError) { // permission error
             cout << "Cannot open device... retrying\n";
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
             if (_lora->open()) {
                 _lora->clearError();
@@ -117,7 +117,7 @@ void MavlinkStream::sendMessageToVehicle(const mavlink_gps_rtcm_data_t &msg) {
 //    cout << "Send rtcm\n";
     if (_udpSock) {
         sendToUDP(wifi_message);
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         printf("send to UDP(%d)\n", wifi_message.seq);
     } else {
         cout << "=============== Failed send to UDP ===============\n";
