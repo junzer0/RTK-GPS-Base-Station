@@ -117,7 +117,7 @@ void MavlinkStream::sendMessageToVehicle(const mavlink_gps_rtcm_data_t &msg) {
 //    cout << "Send rtcm\n";
     if (_udpSock) {
         sendToUDP(wifi_message);
-	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
         printf("send to UDP(%d)\n", wifi_message.seq);
     } else {
         cout << "=============== Failed send to UDP ===============\n";
